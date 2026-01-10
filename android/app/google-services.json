@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "113954642816",
+    "project_id": "quitelee-9bf77",
+    "storage_bucket": "quitelee-9bf77.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:113954642816:android:6e354eb914109b63edff65",
+        "android_client_info": {
+          "package_name": "com.example.quietly"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCJIzpQPysyooooDayx0V2TwO3om7Ef7iQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

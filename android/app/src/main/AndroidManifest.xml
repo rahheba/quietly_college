@@ -38,13 +38,6 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-            
-        <!-- DnD Service -->
-        <service
-            android:name=".DnDService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="microphone" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

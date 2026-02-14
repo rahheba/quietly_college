@@ -4,10 +4,16 @@ import 'package:quietly/features/splash/splash_screen.dart';
 
 import 'utils/methods/mute_fn.dart';
 
-void main() async{
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  Firebase.initializeApp();
-  await initGeoMute();
+  
+  try {
+    await Firebase.initializeApp();
+    await initGeoMute();
+  } catch (e) {
+    print('Initialization error: $e');
+  }
+  
   runApp(const MyApp());
 }
 

@@ -37,6 +37,7 @@ class DnDService : FlutterPlugin, MethodChannel.MethodCallHandler {
         private const val KEY_PREV_NOTIFICATION_VOLUME = "prev_notification_volume"
         private const val KEY_PREV_MUSIC_VOLUME = "prev_music_volume"
         private const val KEY_PREV_DND_FILTER = "prev_dnd_filter"
+        private const val KEY_IS_MUTED_BY_APP = "is_muted_by_app"
         
         @JvmStatic
         fun registerWith(flutterEngine: FlutterEngine) {
@@ -64,6 +65,12 @@ class DnDService : FlutterPlugin, MethodChannel.MethodCallHandler {
                 openDnDSettings()
                 result.success(null)
             }
+            "startMonitoring" -> {
+                startMonitoring(result)
+            }
+            "stopMonitoring" -> {
+                stopMonitoring(result)
+            }
             "setSilent" -> {
                 setSilent(result)
             }
@@ -71,6 +78,34 @@ class DnDService : FlutterPlugin, MethodChannel.MethodCallHandler {
                 restore(result)
             }
             else -> result.notImplemented()
+        }
+    }
+
+    /**
+     * Start background monitoring service
+     */
+    private fun startMonitoring(result: MethodChannel.Result) {
+        try {
+            if (!QuietlyForegroundService.isServiceRunning()) {
+                QuietlyForegroundService.startService(context)
+            }
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("START_MONITORING_FAILED", e.message, null)
+        }
+    }
+
+    /**
+     * Stop background monitoring service
+     */
+    private fun stopMonitoring(result: MethodChannel.Result) {
+        try {
+            if (QuietlyForegroundService.isServiceRunning()) {
+                QuietlyForegroundService.stopService(context)
+            }
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("STOP_MONITORING_FAILED", e.message, null)
         }
     }
 
@@ -103,11 +138,20 @@ class DnDService : FlutterPlugin, MethodChannel.MethodCallHandler {
      */
     private fun setSilent(result: MethodChannel.Result) {
         try {
-            // Start foreground service to keep app alive in background
-            QuietlyForegroundService.startService(context)
+            // Service should already be running via startMonitoring, but ensure it is
+            if (!QuietlyForegroundService.isServiceRunning()) {
+                QuietlyForegroundService.startService(context)
+            }
             
-            // Save current audio state before changing
-            saveCurrentAudioState()
+            // Checks if we already muted the device. 
+            // If true, we DO NOT overwrite the saved state, because the current state is already silent (our doing).
+            val alreadyMutedByApp = prefs.getBoolean(KEY_IS_MUTED_BY_APP, false)
+            
+            if (!alreadyMutedByApp) {
+                // Save current audio state only if it's a fresh mute
+                saveCurrentAudioState()
+                prefs.edit().putBoolean(KEY_IS_MUTED_BY_APP, true).apply()
+            }
             
             // Set DND mode if permission granted
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -116,8 +160,10 @@ class DnDService : FlutterPlugin, MethodChannel.MethodCallHandler {
                     return
                 }
                 
-                // Save current DND filter
-                prefs.edit().putInt(KEY_PREV_DND_FILTER, notificationManager.currentInterruptionFilter).apply()
+                // Save current DND filter IF we haven't already
+                if (!alreadyMutedByApp) {
+                    prefs.edit().putInt(KEY_PREV_DND_FILTER, notificationManager.currentInterruptionFilter).apply()
+                }
                 
                 // Set to total silence
                 notificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_NONE)
@@ -162,8 +208,10 @@ class DnDService : FlutterPlugin, MethodChannel.MethodCallHandler {
             setStreamVolume(AudioManager.STREAM_NOTIFICATION, prevNotificationVolume)
             setStreamVolume(AudioManager.STREAM_MUSIC, prevMusicVolume)
             
-            // Stop foreground service
-            QuietlyForegroundService.stopService(context)
+            // Reset our flag since we have restored state
+            prefs.edit().putBoolean(KEY_IS_MUTED_BY_APP, false).apply()
+            
+            // Do NOT stop service here; it should be stopped explicitly via stopMonitoring when tracking ends
             
             result.success(true)
         } catch (e: Exception) {

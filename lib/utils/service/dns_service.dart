@@ -20,4 +20,12 @@ class DndService {
   Future<void> restore() async {
     if (Platform.isAndroid) await _ch.invokeMethod('restore');
   }
+
+  Future<void> startMonitoring() async {
+    if (Platform.isAndroid) await _ch.invokeMethod('startMonitoring');
+  }
+
+  Future<void> stopMonitoring() async {
+    if (Platform.isAndroid) await _ch.invokeMethod('stopMonitoring');
+  }
 }

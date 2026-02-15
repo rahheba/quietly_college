@@ -8,11 +8,11 @@ class GeoMuteService {
   double? targetLng;
   double targetRadiusMeters = 200.0;
   bool isInside = false;
-  
+
   StreamSubscription<Position>? _positionSubscription;
   DateTime? _lastTriggerTime;
   static const int _debounceSeconds = 10; // Prevent rapid mute/unmute
-  
+
   // State persistence keys
   static const String _keyIsInside = 'geomute_is_inside';
   static const String _keyTargetLat = 'geomute_target_lat';
@@ -22,14 +22,19 @@ class GeoMuteService {
   /// Load target location from database/preferences
   Future<void> loadTargetFromDb() async {
     final prefs = await SharedPreferences.getInstance();
-    
-    // Try to load from preferences first, fallback to hardcoded values
-    targetLat = prefs.getDouble(_keyTargetLat) ?? 10.9756321;
-    targetLng = prefs.getDouble(_keyTargetLng) ?? 76.2172223;
-    targetRadiusMeters = prefs.getDouble(_keyTargetRadius) ?? 40.0;
-    isInside = prefs.getBool(_keyIsInside) ?? false;
-    
-    // Save to preferences if not already saved
+
+    // FORCE UPDATE: Use hardcoded values as source of truth
+    // ignoring cached prefs to ensure code changes take effect
+    targetLat = 10.957435976620744;
+    targetLng = 76.3089999739649;
+
+    targetRadiusMeters = prefs.getDouble(_keyTargetRadius) ?? 100.0;
+
+    // FORCE RESET: Always start as 'outside' to ensure we trigger mute
+    // if the user starts the app while already inside the zone.
+    isInside = false;
+
+    // Save updated values to preferences
     await _saveTargetToPrefs();
   }
 
@@ -58,7 +63,7 @@ class GeoMuteService {
 
     // Check permission status
     LocationPermission permission = await Geolocator.checkPermission();
-    
+
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
@@ -66,7 +71,7 @@ class GeoMuteService {
         return false;
       }
     }
-    
+
     if (permission == LocationPermission.deniedForever) {
       print('Location permissions are permanently denied');
       return false;
@@ -74,7 +79,9 @@ class GeoMuteService {
 
     // Request background location permission (Android 10+)
     if (permission == LocationPermission.whileInUse) {
-      print('Warning: Only foreground location permission granted. Background tracking may not work.');
+      print(
+        'Warning: Only foreground location permission granted. Background tracking may not work.',
+      );
       // On Android, you may need to request background permission separately
       // This requires additional setup in AndroidManifest.xml
     }
@@ -109,25 +116,26 @@ class GeoMuteService {
     print('Target: ($targetLat, $targetLng), Radius: $targetRadiusMeters m');
 
     // Start listening to position updates
-    _positionSubscription = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 10, // Update every 10 meters
-        timeLimit: Duration(seconds: 30), // Timeout for location updates
-      ),
-    ).listen(
-      (Position pos) async {
-        await _handlePositionUpdate(pos, onEnter, onExit);
-      },
-      onError: (error) {
-        print('Location stream error: $error');
-        // Attempt to restart tracking after error
-        Future.delayed(const Duration(seconds: 5), () {
-          startTracking(onEnter: onEnter, onExit: onExit);
-        });
-      },
-      cancelOnError: false,
-    );
+    _positionSubscription =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 10, // Update every 10 meters
+            timeLimit: Duration(seconds: 30), // Timeout for location updates
+          ),
+        ).listen(
+          (Position pos) async {
+            await _handlePositionUpdate(pos, onEnter, onExit);
+          },
+          onError: (error) {
+            print('Location stream error: $error');
+            // Attempt to restart tracking after error
+            Future.delayed(const Duration(seconds: 5), () {
+              startTracking(onEnter: onEnter, onExit: onExit);
+            });
+          },
+          cancelOnError: false,
+        );
   }
 
   /// Handle position updates and trigger geofence events
@@ -144,18 +152,24 @@ class GeoMuteService {
       targetLat!,
       targetLng!,
     );
-    
+
     final nowInside = distance <= targetRadiusMeters;
-    
-    print('Current position: (${pos.latitude}, ${pos.longitude})');
-    print('Distance from target: ${distance.toStringAsFixed(2)} m');
-    print('Status: ${nowInside ? "INSIDE" : "OUTSIDE"} geofence');
+
+    print('--------------------------------------------------');
+    print('📍 CURRENT LOCATION: ${pos.latitude}, ${pos.longitude}');
+    print('🎯 TARGET LOCATION : $targetLat, $targetLng');
+    print('📏 DISTANCE       : ${distance.toStringAsFixed(2)} meters');
+    print('⭕ RADIUS         : $targetRadiusMeters meters');
+    print('🤔 STATUS         : ${nowInside ? "INSIDE ✅" : "OUTSIDE ❌"}');
+    print('--------------------------------------------------');
 
     // Debounce: prevent rapid triggers
     if (_lastTriggerTime != null) {
       final timeSinceLastTrigger = DateTime.now().difference(_lastTriggerTime!);
       if (timeSinceLastTrigger.inSeconds < _debounceSeconds) {
-        print('Debouncing: ignoring trigger (${timeSinceLastTrigger.inSeconds}s since last)');
+        print(
+          'Debouncing: ignoring trigger (${timeSinceLastTrigger.inSeconds}s since last)',
+        );
         return;
       }
     }
@@ -166,7 +180,7 @@ class GeoMuteService {
       isInside = true;
       _lastTriggerTime = DateTime.now();
       await _saveState();
-      
+
       try {
         await onEnter();
       } catch (e) {
@@ -179,7 +193,7 @@ class GeoMuteService {
       isInside = false;
       _lastTriggerTime = DateTime.now();
       await _saveState();
-      
+
       try {
         await onExit();
       } catch (e) {
@@ -200,11 +214,14 @@ class GeoMuteService {
     const R = 6371000.0; // Earth radius in meters
     final dLat = _deg2rad(lat2 - lat1);
     final dLon = _deg2rad(lon2 - lon1);
-    
-    final a = sin(dLat / 2) * sin(dLat / 2) +
-        cos(_deg2rad(lat1)) * cos(_deg2rad(lat2)) *
-        sin(dLon / 2) * sin(dLon / 2);
-    
+
+    final a =
+        sin(dLat / 2) * sin(dLat / 2) +
+        cos(_deg2rad(lat1)) *
+            cos(_deg2rad(lat2)) *
+            sin(dLon / 2) *
+            sin(dLon / 2);
+
     final c = 2 * atan2(sqrt(a), sqrt(1 - a));
     return R * c;
   }

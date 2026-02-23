@@ -25,10 +25,10 @@ class GeoMuteService {
 
     // FORCE UPDATE: Use hardcoded values as source of truth
     // ignoring cached prefs to ensure code changes take effect
-    targetLat = 10.957435976620744;
-    targetLng = 76.3089999739649;
+    targetLat = 10.9755134;
+    targetLng = 76.2144442;
 
-    targetRadiusMeters = prefs.getDouble(_keyTargetRadius) ?? 100.0;
+    targetRadiusMeters = prefs.getDouble(_keyTargetRadius) ?? 300.0;
 
     // FORCE RESET: Always start as 'outside' to ensure we trigger mute
     // if the user starts the app while already inside the zone.

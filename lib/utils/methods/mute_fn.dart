@@ -6,6 +6,8 @@ final geoMute = GeoMuteService();
 final dnd = DndService();
 
 Future<void> initGeoMute() async {
+  // Start foreground service immediately so tracking works in background (300m radius)
+  await dnd.startMonitoring();
   await geoMute.startTracking(
     onEnter: () async {
       if (!await dnd.hasAccess()) {

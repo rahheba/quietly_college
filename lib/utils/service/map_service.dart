@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class GeoMuteService {
   double? targetLat;
   double? targetLng;
-  double targetRadiusMeters = 200.0;
+  double targetRadiusMeters = 300.0;
   bool isInside = false;
 
   StreamSubscription<Position>? _positionSubscription;
@@ -25,8 +25,8 @@ class GeoMuteService {
 
     // FORCE UPDATE: Use hardcoded values as source of truth
     // ignoring cached prefs to ensure code changes take effect
-    targetLat = 10.9755134;
-    targetLng = 76.2144442;
+    targetLat = 10.9577913;
+    targetLng = 76.3087397;
 
     targetRadiusMeters = prefs.getDouble(_keyTargetRadius) ?? 300.0;
 

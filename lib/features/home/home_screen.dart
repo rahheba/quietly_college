@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:quietly/features/class_mode/class_mode_button.dart';
 import 'package:quietly/utils/service/dns_service.dart';
@@ -11,6 +13,34 @@ class _HomeScreenState extends State<HomeScreen> {
   final DndService _dndService = DndService();
   bool _isClassMode = false;
   bool _isLoading = false;
+  String _userName = '';
+  String _userClass = '';
+  bool _userDataLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('Users')
+          .doc(user.uid)
+          .get();
+      if (doc.exists && mounted) {
+        final data = doc.data();
+        setState(() {
+          _userName = data?['name']?.toString() ?? 'Student';
+          _userClass = data?['classname']?.toString() ?? '';
+          _userDataLoaded = true;
+        });
+      }
+    } catch (_) {}
+  }
 
   Future<void> _toggleClassMode() async {
     if (_isLoading) return;
@@ -79,13 +109,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     SizedBox(height: 8),
                     Text(
-                      'Alex Johnson',
+                      _userDataLoaded ? _userName : 'Loading...',
                       style: TextStyle(color: Colors.white70, fontSize: 16),
                     ),
-                    Text(
-                      'Grade 10-A',
-                      style: TextStyle(color: Colors.white70, fontSize: 14),
-                    ),
+                    if (_userClass.isNotEmpty)
+                      Text(
+                        _userClass,
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                      ),
                   ],
                 ),
               ),

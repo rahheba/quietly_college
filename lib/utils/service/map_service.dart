@@ -8,6 +8,7 @@ class GeoMuteService {
   double? targetLng;
   double targetRadiusMeters = 300.0;
   bool isInside = false;
+  bool _isFirstLocationUpdate = true;
 
   StreamSubscription<Position>? _positionSubscription;
   DateTime? _lastTriggerTime;
@@ -115,6 +116,8 @@ class GeoMuteService {
     print('Starting geofence tracking...');
     print('Target: ($targetLat, $targetLng), Radius: $targetRadiusMeters m');
 
+    _isFirstLocationUpdate = true;
+
     // Start listening to position updates
     _positionSubscription =
         Geolocator.getPositionStream(
@@ -164,7 +167,7 @@ class GeoMuteService {
     print('--------------------------------------------------');
 
     // Debounce: prevent rapid triggers
-    if (_lastTriggerTime != null) {
+    if (_lastTriggerTime != null && !_isFirstLocationUpdate) {
       final timeSinceLastTrigger = DateTime.now().difference(_lastTriggerTime!);
       if (timeSinceLastTrigger.inSeconds < _debounceSeconds) {
         print(
@@ -175,7 +178,7 @@ class GeoMuteService {
     }
 
     // Detect entry into geofence
-    if (nowInside && !isInside) {
+    if (nowInside && (!isInside || _isFirstLocationUpdate)) {
       print('🔴 ENTERED geofence - triggering mute');
       isInside = true;
       _lastTriggerTime = DateTime.now();
@@ -188,7 +191,7 @@ class GeoMuteService {
       }
     }
     // Detect exit from geofence
-    else if (!nowInside && isInside) {
+    else if (!nowInside && (isInside || _isFirstLocationUpdate)) {
       print('🟢 EXITED geofence - triggering unmute');
       isInside = false;
       _lastTriggerTime = DateTime.now();
@@ -200,6 +203,8 @@ class GeoMuteService {
         print('Error in onExit callback: $e');
       }
     }
+
+    _isFirstLocationUpdate = false;
   }
 
   /// Stop tracking and clean up resources

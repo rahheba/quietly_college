@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:quietly/features/parent/profile_screen.dart';
 import 'package:quietly/features/parent/show_attendence.dart';
@@ -11,29 +13,66 @@ class ParentDashboard extends StatefulWidget {
 
 class _ParentDashboardState extends State<ParentDashboard> {
   int selectedChildIndex = 0;
+  List<Map<String, dynamic>> children = [];
+  List<DocumentSnapshot> classes = [];
+  bool isLoading = true;
 
-  final List<Map<String, dynamic>> children = [
-    {
-      'name': 'Sarah Johnson',
-      'grade': '10th Grade',
-      'avatar': 'SJ',
-      'todayAttendance': 'Present',
-      'phoneStatus': 'Muted',
-      'totalClasses': 6,
-      'attendedToday': 5,
-      'currentClass': 'Mathematics',
-    },
-    {
-      'name': 'Mike Johnson',
-      'grade': '8th Grade',
-      'avatar': 'MJ',
-      'todayAttendance': 'Present',
-      'phoneStatus': 'Muted',
-      'totalClasses': 6,
-      'attendedToday': 6,
-      'currentClass': 'Science',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadChildren();
+  }
+
+  Future<void> _loadChildren() async {
+    setState(() => isLoading = true);
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        setState(() => isLoading = false);
+        return;
+      }
+      final parentDoc = await FirebaseFirestore.instance
+          .collection('Users')
+          .where('email', isEqualTo: user.email)
+          .where('role', isEqualTo: 'parent')
+          .limit(1)
+          .get();
+      if (parentDoc.docs.isEmpty) {
+        setState(() => isLoading = false);
+        return;
+      }
+      final parentId = parentDoc.docs.first.id;
+      final classesSnapshot = await FirebaseFirestore.instance.collection('Classes').get();
+      classes = classesSnapshot.docs;
+      children.clear();
+      for (var classDoc in classes) {
+        final studentsSnapshot = await FirebaseFirestore.instance
+            .collection('Classes')
+            .doc(classDoc.id)
+            .collection('Students')
+            .where('parentid', isEqualTo: parentId)
+            .get();
+        for (var studentDoc in studentsSnapshot.docs) {
+          final data = studentDoc.data();
+          final name = data['name']?.toString() ?? 'Child';
+          final initials = name.isNotEmpty
+              ? name.split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase()
+              : '?';
+          children.add({
+            'name': name,
+            'grade': data['classname']?.toString() ?? 'N/A',
+            'avatar': initials.length >= 2 ? initials : (name.isNotEmpty ? name[0].toUpperCase() : '?'),
+            'todayAttendance': 'Present',
+            'phoneStatus': 'Active',
+            'totalClasses': 6,
+            'attendedToday': 5,
+            'currentClass': '—',
+          });
+        }
+      }
+    } catch (_) {}
+    if (mounted) setState(() => isLoading = false);
+  }
 
   final List<Map<String, String>> recentActivity = [
     {'time': '09:15 AM', 'event': 'Entered Mathematics class'},
@@ -58,7 +97,43 @@ class _ParentDashboardState extends State<ParentDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    final selectedChild = children[selectedChildIndex];
+    if (isLoading) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFFEF3C7),
+        appBar: AppBar(backgroundColor: Colors.white, elevation: 1),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (children.isEmpty) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFFEF3C7),
+        appBar: AppBar(backgroundColor: Colors.white, elevation: 1, title: const Text('Quietly')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.people_outline, size: 64, color: Colors.grey.shade400),
+                const SizedBox(height: 16),
+                Text(
+                  'No children linked to your account yet.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16, color: Colors.grey.shade700),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Contact your school to link your children.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    final selectedChild = children[selectedChildIndex.clamp(0, children.length - 1)];
 
     return Scaffold(
       backgroundColor: const Color(0xFFFEF3C7),

@@ -1,7 +1,37 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-class TeacherDashboard extends StatelessWidget {
+class TeacherDashboard extends StatefulWidget {
+  @override
+  State<TeacherDashboard> createState() => _TeacherDashboardState();
+}
+
+class _TeacherDashboardState extends State<TeacherDashboard> {
+  String _teacherName = 'Teacher';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTeacherName();
+  }
+
+  Future<void> _loadTeacherName() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('Users')
+          .doc(user.uid)
+          .get();
+      if (doc.exists && mounted) {
+        setState(() {
+          _teacherName = doc.data()?['name']?.toString() ?? 'Teacher';
+        });
+      }
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -16,43 +46,103 @@ class TeacherDashboard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Welcome, Teacher!',
+              'Welcome, $_teacherName!',
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 24),
             _buildTeacherCard(
               icon: Icons.people,
               title: 'Students in Class Mode',
-              count: '15',
+              count: '0',
               color: Colors.green,
             ),
             SizedBox(height: 16),
             StreamBuilder(
-              stream: FirebaseFirestore.instance.collection('Users').where('role',isEqualTo: 'student').snapshots(),
-              builder: (context, asyncSnapshot) {
-                return _buildTeacherCard(
-                  icon: Icons.phone_disabled,
-                  title: 'Total Students',
-                  count: asyncSnapshot.hasData?asyncSnapshot.data!.docs.length.toString():'0',
-                  color: Colors.blue,
+              stream: FirebaseFirestore.instance
+                  .collection('Classes')
+                  .where('teacherId', isEqualTo: FirebaseAuth.instance.currentUser?.uid ?? '')
+                  .snapshots(),
+              builder: (context, classesSnapshot) {
+                if (!classesSnapshot.hasData || classesSnapshot.data!.docs.isEmpty) {
+                  return _buildTeacherCard(
+                    icon: Icons.phone_disabled,
+                    title: 'Total Students',
+                    count: '0',
+                    color: Colors.blue,
+                  );
+                }
+                final firstClassId = classesSnapshot.data!.docs.first.id;
+                return StreamBuilder(
+                  stream: FirebaseFirestore.instance
+                      .collection('Classes')
+                      .doc(firstClassId)
+                      .collection('Students')
+                      .snapshots(),
+                  builder: (context, studentsSnapshot) {
+                    int total = studentsSnapshot.hasData ? studentsSnapshot.data!.docs.length : 0;
+                    return _buildTeacherCard(
+                      icon: Icons.phone_disabled,
+                      title: 'Total Students',
+                      count: total.toString(),
+                      color: Colors.blue,
+                    );
+                  },
                 );
-              }
+              },
             ),
             SizedBox(height: 24),
             Text(
-              'Students Currently in Class Mode:',
+              'Students in Your Classes:',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 12),
             Expanded(
-              child: ListView(
-                children: [
-                  _buildStudentTile('Alex Johnson', 'Roll: 15', true),
-                  _buildStudentTile('Sarah Smith', 'Roll: 08', true),
-                  _buildStudentTile('Mike Brown', 'Roll: 22', true),
-                  _buildStudentTile('Emma Davis', 'Roll: 11', false),
-                  _buildStudentTile('James Wilson', 'Roll: 19', true),
-                ],
+              child: StreamBuilder(
+                stream: FirebaseFirestore.instance
+                    .collection('Classes')
+                    .where('teacherId', isEqualTo: FirebaseAuth.instance.currentUser?.uid ?? '')
+                    .snapshots(),
+                builder: (context, classesSnapshot) {
+                  if (!classesSnapshot.hasData || classesSnapshot.data!.docs.isEmpty) {
+                    return Center(
+                      child: Text(
+                        'No classes yet. Create a class to add students.',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    );
+                  }
+                  final classIds = classesSnapshot.data!.docs.map((d) => d.id).toList();
+                  return StreamBuilder(
+                    stream: FirebaseFirestore.instance
+                        .collection('Classes')
+                        .doc(classIds.first)
+                        .collection('Students')
+                        .snapshots(),
+                    builder: (context, studentsSnapshot) {
+                      if (!studentsSnapshot.hasData) {
+                        return Center(child: CircularProgressIndicator());
+                      }
+                      final students = studentsSnapshot.data!.docs;
+                      if (students.isEmpty) {
+                        return Center(
+                          child: Text(
+                            'No students in this class yet.',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        );
+                      }
+                      return ListView.builder(
+                        itemCount: students.length,
+                        itemBuilder: (context, index) {
+                          final s = students[index].data();
+                          final name = s['name']?.toString() ?? 'Unknown';
+                          final roll = s['rollNo']?.toString() ?? s['email']?.toString() ?? '';
+                          return _buildStudentTile(name, roll.isNotEmpty ? 'Roll: $roll' : 'Student', false);
+                        },
+                      );
+                    },
+                  );
+                },
               ),
             ),
           ],

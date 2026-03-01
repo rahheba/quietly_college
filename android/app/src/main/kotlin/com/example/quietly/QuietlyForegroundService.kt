@@ -96,10 +96,11 @@ class QuietlyForegroundService : Service() {
     }
 
     private fun createNotification(): Notification {
-        // Intent to open app when user taps notification - brings app to foreground
+        // Intent to open app when user taps notification - brings app to foreground and activates background monitoring
         val notificationIntent = Intent(this, MainActivity::class.java).apply {
             setPackage(packageName)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            putExtra(MainActivity.EXTRA_FROM_NOTIFICATION, true)
         }
 
         // PendingIntent flags: FLAG_IMMUTABLE required on Android 12+ (API 31), not available below API 23

@@ -96,6 +96,7 @@ class _AddStudentPageState extends State<AddStudentPage> {
                 'registerNo': _registerNoController.text.trim(),
                 'phone': _phoneController.text.trim(),
                 'place': _addressController.text.trim(),
+                'classId': widget.classId,
                 'status': 1,
                 'role': 'student',
                 'createdAt': FieldValue.serverTimestamp(),

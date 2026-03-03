@@ -15,7 +15,9 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = false;
   String _userName = '';
   String _userClass = '';
+  String _userClassId = '';
   bool _userDataLoaded = false;
+  Stream<QuerySnapshot>? _schedulesStream;
 
   @override
   void initState() {
@@ -36,10 +38,36 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _userName = data?['name']?.toString() ?? 'Student';
           _userClass = data?['classname']?.toString() ?? '';
-              _userDataLoaded = true;
-            });
+          _userClassId = data?['classId']?.toString() ?? '';
+          _userDataLoaded = true;
+          _schedulesStream = _getTodaySchedules();
+        });
       }
     } catch (_) {}
+  }
+
+  Stream<QuerySnapshot> _getTodaySchedules() {
+    if (_userClassId.isEmpty) {
+      return const Stream.empty();
+    }
+    final now = DateTime.now();
+    final dateOnly = DateTime(now.year, now.month, now.day);
+    return FirebaseFirestore.instance
+        .collection('Classes')
+        .doc(_userClassId)
+        .collection('Schedules')
+        .where('date', isEqualTo: Timestamp.fromDate(dateOnly))
+        .snapshots();
+  }
+
+  Color _getSubjectColor(String subject) {
+    final s = subject.toLowerCase();
+    if (s.contains('math')) return Colors.blue;
+    if (s.contains('physic')) return Colors.orange;
+    if (s.contains('chem')) return Colors.green;
+    if (s.contains('english')) return Colors.purple;
+    if (s.contains('computer') || s.contains('bca')) return Colors.teal;
+    return Colors.indigo;
   }
 
   Future<void> _toggleClassMode() async {
@@ -59,9 +87,9 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       setState(() => _isClassMode = !_isClassMode);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -261,20 +289,89 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     SizedBox(height: 16),
-                    _buildScheduleItem(
-                      'Mathematics',
-                      '9:00 AM - 10:00 AM',
-                                Colors.blue,
-                    ),
-                    _buildScheduleItem(
-                      'Physics',
-                      '10:15 AM - 11:15 AM',
-                                Colors.orange,
-                    ),
-                    _buildScheduleItem(
-                      'Chemistry',
-                      '11:30 AM - 12:30 PM',
-                                Colors.green,
+                    if (!_userDataLoaded)
+                      const Center(child: CircularProgressIndicator())
+                    else if (_userClassId.isEmpty)
+                      const Center(child: Text('Class not assigned'))
+                    else
+                      StreamBuilder<QuerySnapshot>(
+                        stream: _schedulesStream,
+                        builder: (context, snapshot) {
+                          if (snapshot.hasError) {
+                            print(
+                              'ERROR: Schedule Stream Error: ${snapshot.error}',
+                            );
+                            return Center(
+                              child: Column(
+                                children: [
+                                  Icon(Icons.error_outline, color: Colors.red),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    'Error loading schedules. Please check if indexes are created.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.red.shade400,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Error: ${snapshot.error}',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.grey,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+                          if (!snapshot.hasData ||
+                              snapshot.data!.docs.isEmpty) {
+                            return Center(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 20,
+                                ),
+                                child: Text(
+                                  'No schedules for today',
+                                  style: TextStyle(color: Colors.grey.shade600),
+                                ),
+                              ),
+                            );
+                          }
+
+                          final docs = snapshot.data!.docs;
+                          // Sort in memory to avoid needing a composite index
+                          docs.sort((a, b) {
+                            final aId =
+                                (a.data() as Map<String, dynamic>)['periodId']
+                                    ?.toString() ??
+                                '';
+                            final bId =
+                                (b.data() as Map<String, dynamic>)['periodId']
+                                    ?.toString() ??
+                                '';
+                            return aId.compareTo(bId);
+                          });
+
+                          return Column(
+                            children: docs.map((doc) {
+                              final data = doc.data() as Map<String, dynamic>;
+                              return _buildScheduleItem(
+                                data['subjectTitle'] ?? 'No Title',
+                                data['time'] ?? '',
+                                _getSubjectColor(data['subjectTitle'] ?? ''),
+                              );
+                            }).toList(),
+                          );
+                        },
                       ),
                   ],
                 ),

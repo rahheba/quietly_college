@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -13,14 +14,53 @@ class _NotificationScreenState extends State<NotificationScreen> {
   static const Color _brown = Color.fromARGB(255, 145, 87, 1);
   static const Color _lightBrown = Color(0xFFF5ECD7);
 
+  String _userClassId = '';
+  bool _userDataLoaded = false;
+  Stream<QuerySnapshot>? _notificationsStreamVar;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('Users')
+          .doc(user.uid)
+          .get();
+      if (doc.exists && mounted) {
+        setState(() {
+          _userClassId = doc.data()?['classId']?.toString() ?? '';
+          _userDataLoaded = true;
+          _notificationsStreamVar = _getNotificationsStream();
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading user data: $e');
+      if (mounted) {
+        setState(() {
+          _userDataLoaded = true; // Still allow showing empty stream or error
+        });
+      }
+    }
+  }
+
   // ------------------------------------------------------------------
-  // Firestore stream – sorted newest-first
+  // Firestore stream – filtered by classId
   // ------------------------------------------------------------------
-  Stream<QuerySnapshot> _notificationsStream() {
-    return FirebaseFirestore.instance
-        .collection('Notifications')
-        .orderBy('timestamp', descending: true)
-        .snapshots();
+  Stream<QuerySnapshot> _getNotificationsStream() {
+    Query query = FirebaseFirestore.instance.collection('Notifications');
+
+    if (_userClassId.isNotEmpty) {
+      query = query.where('classId', isEqualTo: _userClassId);
+    }
+
+    // Removed orderBy here to avoid index requirements; sorting in memory instead
+    return query.snapshots();
   }
 
   // ------------------------------------------------------------------
@@ -207,10 +247,43 @@ class _NotificationScreenState extends State<NotificationScreen> {
   // ------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
+    if (!_userDataLoaded) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF9F4EE),
+        appBar: AppBar(
+          title: const Text(
+            'Notifications',
+            style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.4),
+          ),
+          backgroundColor: _brown,
+          foregroundColor: Colors.white,
+        ),
+        body: const Center(child: CircularProgressIndicator(color: _brown)),
+      );
+    }
+
     return StreamBuilder<QuerySnapshot>(
-      stream: _notificationsStream(),
+      stream: _notificationsStreamVar,
       builder: (context, snapshot) {
-        final docs = snapshot.data?.docs ?? [];
+        if (snapshot.hasError) {
+          debugPrint('Firestore Error: ${snapshot.error}');
+          // Could be a missing index if orderBy was still there,
+          // but now we're checking for other potential issues.
+        }
+
+        final allDocs = snapshot.data?.docs ?? [];
+
+        // Sort in memory: Newest timestamp first
+        final docs = List<QueryDocumentSnapshot>.from(allDocs);
+        docs.sort((a, b) {
+          final aData = a.data() as Map<String, dynamic>;
+          final bData = b.data() as Map<String, dynamic>;
+          final aTs = aData['timestamp'] as Timestamp?;
+          final bTs = bData['timestamp'] as Timestamp?;
+          if (aTs == null) return 1;
+          if (bTs == null) return -1;
+          return bTs.compareTo(aTs);
+        });
 
         // Count unread
         final unreadCount = docs.where((d) {

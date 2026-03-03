@@ -730,7 +730,7 @@ class _ParentAttendanceScreenState extends State<ParentAttendanceScreen> {
                 Text(
                   'ATTENDANCE RECORDS (${filteredRecords.length})',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 10,
                     fontWeight: FontWeight.bold,
                     color: Colors.grey.shade600,
                     letterSpacing: 1,
@@ -795,11 +795,16 @@ class _ParentAttendanceScreenState extends State<ParentAttendanceScreen> {
                     ),
                     child: Icon(statusIcon, color: statusColor),
                   ),
-                  title: Row(
+                  title: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Period $period',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                        ),
                       ),
                       if (record['subjectTitle'] != null &&
                           record['subjectTitle'] != 'N/A') ...[
@@ -807,7 +812,7 @@ class _ParentAttendanceScreenState extends State<ParentAttendanceScreen> {
                         Text(
                           '• ${record['subjectTitle']}',
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 10,
                             color: Colors.indigo.shade700,
                             fontWeight: FontWeight.w600,
                           ),

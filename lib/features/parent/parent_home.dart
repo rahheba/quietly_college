@@ -114,26 +114,50 @@ class _ParentDashboardState extends State<ParentDashboard> {
     if (mounted) setState(() => isLoading = false);
   }
 
-  final List<Map<String, String>> recentActivity = [
-    {'time': '09:15 AM', 'event': 'Entered Mathematics class'},
-    {'time': '08:30 AM', 'event': 'Phone muted automatically'},
-    {'time': '08:15 AM', 'event': 'Arrived at school'},
-    {'time': 'Yesterday', 'event': 'Completed all classes'},
-  ];
+  Stream<QuerySnapshot> _getActivityStream(String classId, String studentId) {
+    if (classId.isEmpty || studentId.isEmpty) return const Stream.empty();
+    return FirebaseFirestore.instance
+        .collection('Classes')
+        .doc(classId)
+        .collection('Students')
+        .doc(studentId)
+        .collection('attendance')
+        .orderBy('date', descending: true)
+        .limit(5)
+        .snapshots();
+  }
 
-  final List<Map<String, String>> upcomingClasses = [
-    {
-      'subject': 'English Literature',
-      'time': '11:00 AM - 11:45 AM',
-      'room': 'Room 204',
-    },
-    {
-      'subject': 'Physical Education',
-      'time': '12:00 PM - 12:45 PM',
-      'room': 'Gymnasium',
-    },
-    {'subject': 'History', 'time': '01:00 PM - 01:45 PM', 'room': 'Room 301'},
-  ];
+  String _formatActivityTime(Timestamp? timestamp) {
+    if (timestamp == null) return '--:--';
+    final date = timestamp.toDate();
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      final hour = date.hour > 12
+          ? date.hour - 12
+          : (date.hour == 0 ? 12 : date.hour);
+      final ampm = date.hour >= 12 ? 'PM' : 'AM';
+      final minute = date.minute.toString().padLeft(2, '0');
+      return '$hour:$minute $ampm';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
+    } else {
+      return '${date.day}/${date.month}';
+    }
+  }
+
+  Stream<QuerySnapshot> _getSchedulesStream(String classId) {
+    if (classId.isEmpty) return const Stream.empty();
+    final now = DateTime.now();
+    final dateOnly = DateTime(now.year, now.month, now.day);
+    return FirebaseFirestore.instance
+        .collection('Classes')
+        .doc(classId)
+        .collection('Schedules')
+        .where('date', isEqualTo: Timestamp.fromDate(dateOnly))
+        .snapshots();
+  }
 
   String _getCurrentClassStatus() {
     final now = DateTime.now();
@@ -454,41 +478,79 @@ class _ParentDashboardState extends State<ParentDashboard> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    ...recentActivity.map(
-                      (activity) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Icon(
-                              Icons.check_circle,
-                              color: Colors.green,
-                              size: 20,
+                    StreamBuilder<QuerySnapshot>(
+                      stream: _getActivityStream(
+                        selectedChild['classId'],
+                        selectedChild['id'],
+                      ),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                          return Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              child: Text(
+                                'No recent activity',
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 12,
+                                ),
+                              ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
+                          );
+                        }
+
+                        return Column(
+                          children: snapshot.data!.docs.map((doc) {
+                            final data = doc.data() as Map<String, dynamic>;
+                            final subject =
+                                data['subjectTitle']?.toString() ?? 'Class';
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    activity['event']!,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w500,
-                                    ),
+                                  const Icon(
+                                    Icons.check_circle,
+                                    color: Colors.green,
+                                    size: 20,
                                   ),
-                                  Text(
-                                    activity['time']!,
-                                    style: const TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: 12,
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Entered $subject class',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w500,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        Text(
+                                          _formatActivityTime(
+                                            data['date'] as Timestamp?,
+                                          ),
+                                          style: const TextStyle(
+                                            color: Colors.grey,
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
+                            );
+                          }).toList(),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -505,63 +567,114 @@ class _ParentDashboardState extends State<ParentDashboard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Upcoming Classes',
+                      'Today Classes',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 16),
-                    ...upcomingClasses.map(
-                      (cls) => Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFFEF3C7), Color(0xFFFED7AA)],
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFFEBD38)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              cls['subject']!,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                    StreamBuilder<QuerySnapshot>(
+                      stream: _getSchedulesStream(selectedChild['classId']),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                          return Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 20),
+                              child: Text(
+                                'No classes scheduled for today',
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 12,
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.access_time,
-                                  size: 16,
-                                  color: Colors.grey,
+                          );
+                        }
+
+                        final docs = snapshot.data!.docs;
+                        // Sort in memory like in student home
+                        docs.sort((a, b) {
+                          final aId =
+                              (a.data() as Map<String, dynamic>)['periodId']
+                                  ?.toString() ??
+                              '';
+                          final bId =
+                              (b.data() as Map<String, dynamic>)['periodId']
+                                  ?.toString() ??
+                              '';
+                          return aId.compareTo(bId);
+                        });
+
+                        return Column(
+                          children: docs.map((doc) {
+                            final data = doc.data() as Map<String, dynamic>;
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(
+                                12,
+                              ), // Reduced padding
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFFFEF3C7),
+                                    Color(0xFFFED7AA),
+                                  ],
                                 ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  cls['time']!,
-                                  style: const TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 14,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: const Color(0xFFFEBD38),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Period ${data['periodId'] ?? 'N/A'}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 10,
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              cls['room']!,
-                              style: const TextStyle(
-                                color: Colors.grey,
-                                fontSize: 14,
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    data['subjectTitle'] ?? 'No Title',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 10,
+                                      color: Colors.indigo.shade700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.access_time,
+                                        size: 10,
+                                        color: Colors.grey,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        data['time'] ?? 'N/A',
+                                        style: const TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
+                            );
+                          }).toList(),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -593,11 +706,11 @@ class _ParentDashboardState extends State<ParentDashboard> {
                       mainAxisSpacing: 12,
                       childAspectRatio: 1.2,
                       children: [
-                        _buildQuickAction(
-                          icon: Icons.calendar_today,
-                          label: 'View Full Schedule',
-                          onTap: () {},
-                        ),
+                        // _buildQuickAction(
+                        //   icon: Icons.calendar_today,
+                        //   label: 'View Full Schedule',
+                        //   onTap: () {},
+                        // ),
                         _buildQuickAction(
                           icon: Icons.check_circle_outline,
                           label: 'Attendance Report',
@@ -612,16 +725,16 @@ class _ParentDashboardState extends State<ParentDashboard> {
                             );
                           },
                         ),
-                        _buildQuickAction(
-                          icon: Icons.phone_android,
-                          label: 'Phone Settings',
-                          onTap: () {},
-                        ),
-                        _buildQuickAction(
-                          icon: Icons.notifications_outlined,
-                          label: 'Notifications',
-                          onTap: () {},
-                        ),
+                        // _buildQuickAction(
+                        //   icon: Icons.phone_android,
+                        //   label: 'Phone Settings',
+                        //   onTap: () {},
+                        // ),
+                        // _buildQuickAction(
+                        //   icon: Icons.notifications_outlined,
+                        //   label: 'Notifications',
+                        //   onTap: () {},
+                        // ),
                       ],
                     ),
                   ],

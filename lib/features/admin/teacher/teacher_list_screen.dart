@@ -354,12 +354,6 @@ class _TeacherManagementPageState extends State<TeacherManagementPage>
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit, color: Colors.blue),
-                              onPressed: () {
-                                // TODO: Navigate to edit screen
-                              },
-                            ),
                             PopupMenuButton<String>(
                               icon: const Icon(Icons.more_vert),
                               onSelected: (value) {

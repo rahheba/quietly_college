@@ -77,8 +77,23 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
           };
         }).toList();
       });
+
+      if (teacherClasses.isEmpty && mounted) {
+        showCustomSnackBar(
+          context: context,
+          message: 'No classes found in database',
+          status: SnackStatus.warning,
+        );
+      }
     } catch (e) {
       print('Error loading classes: $e');
+      if (mounted) {
+        showCustomSnackBar(
+          context: context,
+          message: 'Error loading classes: $e',
+          status: SnackStatus.error,
+        );
+      }
     }
   }
 
@@ -102,6 +117,13 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
       });
     } catch (e) {
       print('Error loading subjects: $e');
+      if (mounted) {
+        showCustomSnackBar(
+          context: context,
+          message: 'Error loading subjects: $e',
+          status: SnackStatus.error,
+        );
+      }
     }
   }
 
@@ -124,7 +146,7 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
       final now = DateTime.now();
       final dateOnly = DateTime(now.year, now.month, now.day);
 
-      await _firestore.collection('Schedules').add({
+      final scheduleData = {
         'classId': selectedClassId,
         'className': selectedClassName,
         'subjectId': selectedSubjectId,
@@ -135,7 +157,17 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
         'date': Timestamp.fromDate(dateOnly),
         'createdAt': FieldValue.serverTimestamp(),
         'teacherId': _auth.currentUser?.uid,
-      });
+      };
+
+      // Save to global collection
+      await _firestore.collection('Schedules').add(scheduleData);
+
+      // Save to class subcollection for easy access by students
+      await _firestore
+          .collection('Classes')
+          .doc(selectedClassId)
+          .collection('Schedules')
+          .add(scheduleData);
 
       if (mounted) {
         showCustomSnackBar(
@@ -180,7 +212,9 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    value: selectedClassId,
+                    value: teacherClasses.any((c) => c['id'] == selectedClassId)
+                        ? selectedClassId
+                        : null,
                     decoration: InputDecoration(
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -198,13 +232,18 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
                       );
                     }).toList(),
                     onChanged: (val) {
-                      setState(() {
-                        selectedClassId = val;
-                        selectedClassName = teacherClasses.firstWhere(
-                          (c) => c['id'] == val,
-                        )['classname'];
-                        _loadSubjects(val!);
-                      });
+                      if (val == null) return;
+                      final selectedClass = teacherClasses.firstWhere(
+                        (c) => c['id'] == val,
+                        orElse: () => {},
+                      );
+                      if (selectedClass.isNotEmpty) {
+                        setState(() {
+                          selectedClassId = val;
+                          selectedClassName = selectedClass['classname'];
+                          _loadSubjects(val);
+                        });
+                      }
                     },
                   ),
                   const SizedBox(height: 20),
@@ -215,7 +254,9 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    value: selectedSubjectId,
+                    value: subjects.any((s) => s['id'] == selectedSubjectId)
+                        ? selectedSubjectId
+                        : null,
                     decoration: InputDecoration(
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -233,12 +274,17 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
                       );
                     }).toList(),
                     onChanged: (val) {
-                      setState(() {
-                        selectedSubjectId = val;
-                        selectedSubjectName = subjects.firstWhere(
-                          (s) => s['id'] == val,
-                        )['title'];
-                      });
+                      if (val == null) return;
+                      final selectedSub = subjects.firstWhere(
+                        (s) => s['id'] == val,
+                        orElse: () => {},
+                      );
+                      if (selectedSub.isNotEmpty) {
+                        setState(() {
+                          selectedSubjectId = val;
+                          selectedSubjectName = selectedSub['title'];
+                        });
+                      }
                     },
                   ),
                   const SizedBox(height: 20),

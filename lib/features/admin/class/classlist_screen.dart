@@ -4,14 +4,52 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:quietly/features/admin/class/addclass_screen.dart';
 import 'package:quietly/features/admin/class/classdetail_screen.dart';
 
-class ClassesListScreen extends StatelessWidget {
+class ClassesListScreen extends StatefulWidget {
   final bool? showAppBar;
   const ClassesListScreen({Key? key, this.showAppBar}) : super(key: key);
 
   @override
+  State<ClassesListScreen> createState() => _ClassesListScreenState();
+}
+
+class _ClassesListScreenState extends State<ClassesListScreen> {
+  Future<void> _showDeleteDialog(BuildContext context, String classId) async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete Class'),
+          content: const Text(
+            'Are you sure you want to permanently delete this class?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm == true) {
+      await FirebaseFirestore.instance
+          .collection('Classes')
+          .doc(classId)
+          .delete();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: (showAppBar ?? false)
+      appBar: (widget.showAppBar ?? false)
           ? AppBar(
               title: const Text('Classes'),
               backgroundColor: Colors.blue,
@@ -58,10 +96,7 @@ class ClassesListScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
+                  contentPadding: EdgeInsets.only(left: 10, right: 10),
                   leading: CircleAvatar(
                     backgroundColor: status == 1 ? Colors.green : Colors.grey,
                     child: Text(
@@ -95,9 +130,27 @@ class ClassesListScreen extends StatelessWidget {
                       const SizedBox(height: 4),
                     ],
                   ),
-                  trailing: Icon(
-                    status == 1 ? Icons.check_circle : Icons.cancel,
-                    color: status == 1 ? Colors.green : Colors.grey,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        status == 1 ? Icons.check_circle : Icons.cancel,
+                        color: status == 1 ? Colors.green : Colors.grey,
+                      ),
+                      SizedBox(width: 4),
+
+                      InkWell(
+                        onTap: () {},
+                        child: Icon(Icons.edit, color: Colors.blue),
+                      ),
+                      SizedBox(width: 4),
+                      InkWell(
+                        onTap: () {
+                          _showDeleteDialog(context, document.id);
+                        },
+                        child: const Icon(Icons.delete, color: Colors.red),
+                      ),
+                    ],
                   ),
                   // Handle tap - navigate to detail screen or show details
                   onTap: () {

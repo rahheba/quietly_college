@@ -3,7 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class ParentAttendanceScreen extends StatefulWidget {
-  const ParentAttendanceScreen({Key? key}) : super(key: key);
+  final String? initialChildId;
+  const ParentAttendanceScreen({Key? key, this.initialChildId})
+    : super(key: key);
 
   @override
   State<ParentAttendanceScreen> createState() => _ParentAttendanceScreenState();
@@ -91,7 +93,8 @@ class _ParentAttendanceScreenState extends State<ParentAttendanceScreen> {
       }
 
       if (childrenData.isNotEmpty) {
-        selectedChildId = childrenData.first['id']?.toString() ?? '';
+        selectedChildId =
+            widget.initialChildId ?? childrenData.first['id']?.toString() ?? '';
         await _loadAttendanceData();
       }
     } catch (e) {
@@ -165,6 +168,7 @@ class _ParentAttendanceScreenState extends State<ParentAttendanceScreen> {
           'markedAt': data['markedAt'] is Timestamp
               ? (data['markedAt'] as Timestamp).toDate()
               : null,
+          'subjectTitle': data['subjectTitle']?.toString() ?? 'N/A',
         });
 
         // Update statistics
@@ -791,9 +795,25 @@ class _ParentAttendanceScreenState extends State<ParentAttendanceScreen> {
                     ),
                     child: Icon(statusIcon, color: statusColor),
                   ),
-                  title: Text(
-                    'Period $period',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  title: Row(
+                    children: [
+                      Text(
+                        'Period $period',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      if (record['subjectTitle'] != null &&
+                          record['subjectTitle'] != 'N/A') ...[
+                        const SizedBox(width: 8),
+                        Text(
+                          '• ${record['subjectTitle']}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.indigo.shade700,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

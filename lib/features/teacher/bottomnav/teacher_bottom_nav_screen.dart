@@ -40,7 +40,7 @@ class _TeacherBottomNavState extends State<TeacherBottomNav> {
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
           BottomNavigationBarItem(
             icon: Icon(Icons.calendar_month),
-            label: 'Attedence',
+            label: 'Attendance',
           ),
         ],
       ),

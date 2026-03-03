@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'addstudent.dart';
 
-class ClassDetailsScreen extends StatelessWidget {
+class ClassDetailsScreen extends StatefulWidget {
   final String classId;
   final String className;
   final String departmentName;
@@ -14,6 +14,11 @@ class ClassDetailsScreen extends StatelessWidget {
     required this.departmentName,
   });
 
+  @override
+  State<ClassDetailsScreen> createState() => _ClassDetailsScreenState();
+}
+
+class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -33,13 +38,30 @@ class ClassDetailsScreen extends StatelessWidget {
           ),
         ),
       ),
-      body: Column(
-        children: [
-          _buildClassHeader(),
-          Expanded(
-            child: _buildStudentsList(),
-          ),
-        ],
+      body: DefaultTabController(
+        length: 2,
+        child: Column(
+          children: [
+            _buildClassHeader(),
+            Container(
+              color: Colors.white,
+              child: TabBar(
+                labelColor: Color(0xFF667eea),
+                unselectedLabelColor: Colors.grey,
+                indicatorColor: Color(0xFF667eea),
+                tabs: [
+                  Tab(text: 'Students'),
+                  Tab(text: 'Subjects'),
+                ],
+              ),
+            ),
+            Expanded(
+              child: TabBarView(
+                children: [_buildStudentsList(), _buildSubjectsList()],
+              ),
+            ),
+          ],
+        ),
       ),
 
       // ✅ FAB Navigates to AddStudent Screen
@@ -49,9 +71,9 @@ class ClassDetailsScreen extends StatelessWidget {
             context,
             MaterialPageRoute(
               builder: (context) => AddStudentPage(
-                classId: classId,
-                className: className,
-                departmentName: departmentName,
+                classId: widget.classId,
+                className: widget.className,
+                departmentName: widget.departmentName,
               ),
             ),
           );
@@ -60,10 +82,7 @@ class ClassDetailsScreen extends StatelessWidget {
         icon: Icon(Icons.person_add, color: Colors.white),
         label: Text(
           'Add Student',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
         ),
       ),
     );
@@ -73,35 +92,47 @@ class ClassDetailsScreen extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.shade200,
-            blurRadius: 10,
-            offset: Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      decoration: BoxDecoration(color: Colors.white),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            className,
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey.shade800,
-              letterSpacing: -0.5,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.className,
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey.shade800,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  widget.departmentName,
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ),
-          SizedBox(height: 8),
-          Text(
-            departmentName,
-            style: TextStyle(
-              fontSize: 18,
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.w500,
+          ElevatedButton.icon(
+            onPressed: () => _showAddSubjectDialog(context),
+            icon: Icon(Icons.book, size: 18, color: Colors.white),
+            label: Text(
+              'Add Subject',
+              style: TextStyle(color: Colors.white, fontSize: 13),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFF667eea),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
           ),
         ],
@@ -113,15 +144,13 @@ class ClassDetailsScreen extends StatelessWidget {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('Classes')
-          .doc(classId)
+          .doc(widget.classId)
           .collection('Students')
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(
-            child: CircularProgressIndicator(
-              color: Color(0xFF667eea),
-            ),
+            child: CircularProgressIndicator(color: Color(0xFF667eea)),
           );
         }
 
@@ -147,10 +176,7 @@ class ClassDetailsScreen extends StatelessWidget {
                 SizedBox(height: 8),
                 Text(
                   'Add students using the button below',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade500,
-                  ),
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
                 ),
               ],
             ),
@@ -263,8 +289,11 @@ class ClassDetailsScreen extends StatelessWidget {
                       ),
                     ),
                     IconButton(
-                      icon: Icon(Icons.delete_outline, color: Colors.red.shade400),
-                      onPressed: () => _deleteStudent(context, studentId),
+                      icon: Icon(
+                        Icons.delete_outline,
+                        color: Colors.red.shade400,
+                      ),
+                      onPressed: () => _deleteStudent(studentId),
                     ),
                   ],
                 ),
@@ -328,25 +357,174 @@ class ClassDetailsScreen extends StatelessWidget {
         Expanded(
           child: Text(
             value,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade600,
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
           ),
         ),
       ],
     );
   }
 
-  Future<void> _deleteStudent(BuildContext context, String studentId) async {
+  Widget _buildSubjectsList() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('Classes')
+          .doc(widget.classId)
+          .collection('Subjects')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(
+            child: CircularProgressIndicator(color: Color(0xFF667eea)),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.book_outlined,
+                  size: 80,
+                  color: Colors.grey.shade300,
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'No subjects yet',
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: EdgeInsets.all(16),
+          itemCount: snapshot.data!.docs.length,
+          itemBuilder: (context, index) {
+            var subjectDoc = snapshot.data!.docs[index];
+            var subject = subjectDoc.data() as Map<String, dynamic>;
+
+            return Container(
+              margin: EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.shade200,
+                    blurRadius: 5,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: ListTile(
+                leading: Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Color(0xFF667eea).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.book, color: Color(0xFF667eea)),
+                ),
+                title: Text(
+                  subject['title'] ?? 'N/A',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(subject['code'] ?? 'N/A'),
+                trailing: IconButton(
+                  icon: Icon(Icons.delete_outline, color: Colors.red.shade400),
+                  onPressed: () => _deleteSubject(subjectDoc.id),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showAddSubjectDialog(BuildContext context) {
+    final titleController = TextEditingController();
+    final codeController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Add New Subject'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleController,
+              decoration: InputDecoration(
+                labelText: 'Subject Title',
+                prefixIcon: Icon(Icons.book),
+              ),
+            ),
+            SizedBox(height: 16),
+            TextField(
+              controller: codeController,
+              decoration: InputDecoration(
+                labelText: 'Subject Code',
+                prefixIcon: Icon(Icons.code),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (titleController.text.isNotEmpty &&
+                  codeController.text.isNotEmpty) {
+                _saveSubject(titleController.text, codeController.text);
+                Navigator.pop(context);
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF667eea)),
+            child: Text('Save', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveSubject(String title, String code) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('Classes')
+          .doc(widget.classId)
+          .collection('Subjects')
+          .add({
+            'title': title,
+            'code': code,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Subject added successfully')));
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error adding subject: $e')));
+    }
+  }
+
+  Future<void> _deleteSubject(String subjectId) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Text('Delete Student'),
-        content: Text('Are you sure you want to delete this student?'),
+        title: Text('Delete Subject'),
+        content: Text('Are you sure you want to delete this subject?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -354,9 +532,7 @@ class ClassDetailsScreen extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: Text('Delete', style: TextStyle(color: Colors.white)),
           ),
         ],
@@ -367,25 +543,68 @@ class ClassDetailsScreen extends StatelessWidget {
       try {
         await FirebaseFirestore.instance
             .collection('Classes')
-            .doc(classId)
-            .collection('Students')
-            .doc(studentId)
+            .doc(widget.classId)
+            .collection('Subjects')
+            .doc(subjectId)
             .delete();
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Student deleted successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Subject deleted successfully')));
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error deleting student: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error deleting subject: $e')));
       }
+    }
+  }
+
+  Future<void> _deleteStudent(String studentId) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Delete Student'),
+        content: Text('Are you sure you want to delete this student?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted || confirm != true) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('Classes')
+          .doc(widget.classId)
+          .collection('Students')
+          .doc(studentId)
+          .delete();
+
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Student deleted successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Error deleting student: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 }

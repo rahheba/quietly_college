@@ -1208,6 +1208,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:quietly/features/admin/class/classlist_screen.dart';
+import 'package:quietly/features/teacher/schedule/add_schedule_screen.dart';
 import 'package:quietly/features/auth/view/login_screen.dart';
 import 'package:quietly/utils/methods/custom_snackbar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -1827,6 +1828,19 @@ class _TeacherProfileState extends State<TeacherProfile> {
                     context,
                     MaterialPageRoute(
                       builder: (context) => ClassesListScreen(showAppBar: true),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 12),
+                _buildButton(
+                  context,
+                  label: 'Add Today Schedule',
+                  icon: Icons.calendar_today,
+                  color: Colors.blue,
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AddScheduleScreen(),
                     ),
                   ),
                 ),

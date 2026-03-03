@@ -15,6 +15,7 @@ class _StudentAttendanceViewerState extends State<StudentAttendanceViewer> {
 
   String selectedMonth = DateTime.now().month.toString();
   String selectedPeriod = 'all';
+  DateTime? selectedDate = DateTime.now();
   bool isLoading = true;
 
   Map<String, String> studentInfo = {
@@ -99,29 +100,55 @@ class _StudentAttendanceViewerState extends State<StudentAttendanceViewer> {
     try {
       setState(() => isLoading = true);
 
-      final currentYear = DateTime.now().year;
-      final selectedMonthIndex = months.indexOf(selectedMonth) + 1;
-
-      final startDate = DateTime(currentYear, selectedMonthIndex, 1);
-      final endDate = DateTime(
-        currentYear,
-        selectedMonthIndex + 1,
-        0,
-        23,
-        59,
-        59,
-      );
-
-      final attendanceSnapshot = await _firestore
+      final query = _firestore
           .collection('Classes')
           .doc(studentInfo['classId'])
           .collection('Students')
           .doc(studentInfo['id'])
-          .collection('attendance')
-          .where('date', isGreaterThanOrEqualTo: startDate)
-          .where('date', isLessThanOrEqualTo: endDate)
-          .orderBy('date', descending: true)
-          .get();
+          .collection('attendance');
+
+      QuerySnapshot<Map<String, dynamic>> attendanceSnapshot;
+
+      if (selectedDate != null) {
+        // Filter by specific date
+        final startOfDay = DateTime(
+          selectedDate!.year,
+          selectedDate!.month,
+          selectedDate!.day,
+        );
+        final endOfDay = DateTime(
+          selectedDate!.year,
+          selectedDate!.month,
+          selectedDate!.day,
+          23,
+          59,
+          59,
+        );
+
+        attendanceSnapshot = await query
+            .where('date', isGreaterThanOrEqualTo: startOfDay)
+            .where('date', isLessThanOrEqualTo: endOfDay)
+            .get();
+      } else {
+        // Filter by month
+        final currentYear = DateTime.now().year;
+        final selectedMonthIndex = months.indexOf(selectedMonth) + 1;
+        final startDate = DateTime(currentYear, selectedMonthIndex, 1);
+        final endDate = DateTime(
+          currentYear,
+          selectedMonthIndex + 1,
+          0,
+          23,
+          59,
+          59,
+        );
+
+        attendanceSnapshot = await query
+            .where('date', isGreaterThanOrEqualTo: startDate)
+            .where('date', isLessThanOrEqualTo: endDate)
+            .orderBy('date', descending: true)
+            .get();
+      }
 
       attendanceRecords.clear();
       attendanceStats = {'total': 0, 'present': 0, 'absent': 0, 'late': 0};
@@ -142,6 +169,7 @@ class _StudentAttendanceViewerState extends State<StudentAttendanceViewer> {
           'markedAt': data['markedAt'] is Timestamp
               ? (data['markedAt'] as Timestamp).toDate()
               : null,
+          'subjectTitle': data['subjectTitle']?.toString() ?? 'N/A',
         });
 
         attendanceStats['total'] = (attendanceStats['total'] ?? 0) + 1;
@@ -229,10 +257,22 @@ class _StudentAttendanceViewerState extends State<StudentAttendanceViewer> {
   List<Map<String, dynamic>> getFilteredRecords() {
     return attendanceRecords.where((record) {
       final recordDate = record['date'] as DateTime;
-      final matchesMonth = recordDate.month.toString() == selectedMonth;
+
+      bool matchesDate = true;
+      if (selectedDate != null) {
+        matchesDate =
+            recordDate.year == selectedDate!.year &&
+            recordDate.month == selectedDate!.month &&
+            recordDate.day == selectedDate!.day;
+      } else {
+        matchesDate =
+            recordDate.month.toString() ==
+            (months.indexOf(selectedMonth) + 1).toString();
+      }
+
       final matchesPeriod =
           selectedPeriod == 'all' || record['period'] == selectedPeriod;
-      return matchesMonth && matchesPeriod;
+      return matchesDate && matchesPeriod;
     }).toList()..sort(
       (a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime),
     );
@@ -560,103 +600,159 @@ class _StudentAttendanceViewerState extends State<StudentAttendanceViewer> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         child: Padding(
-                          padding: const EdgeInsets.all(4),
+                          padding: const EdgeInsets.all(16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                'Filter Attendance',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'Filter Attendance',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  if (selectedDate != null)
+                                    TextButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          selectedDate = null;
+                                          _loadAttendanceData();
+                                        });
+                                      },
+                                      child: const Text('Show Month View'),
+                                    ),
+                                ],
                               ),
                               const SizedBox(height: 12),
-                              Column(
+                              Row(
                                 children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        flex: 1,
-                                        child: DropdownButtonFormField<String>(
-                                          value: selectedMonth,
-                                          decoration: InputDecoration(
-                                            labelText: 'Month',
-                                            border: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-                                            contentPadding:
-                                                const EdgeInsets.symmetric(
-                                                  horizontal: 12,
-                                                  vertical: 8,
-                                                ),
-                                          ),
-                                          items: List.generate(12, (index) {
-                                            return DropdownMenuItem(
-                                              value: (index + 1).toString(),
-                                              child: Text(months[index]),
-                                            );
-                                          }),
-                                          onChanged: (value) {
-                                            setState(() {
-                                              selectedMonth = value!;
-                                            });
-                                          },
+                                  Expanded(
+                                    child: InkWell(
+                                      onTap: () async {
+                                        final date = await showDatePicker(
+                                          context: context,
+                                          initialDate:
+                                              selectedDate ?? DateTime.now(),
+                                          firstDate: DateTime(2020),
+                                          lastDate: DateTime.now(),
+                                        );
+                                        if (date != null) {
+                                          setState(() {
+                                            selectedDate = date;
+                                            _loadAttendanceData();
+                                          });
+                                        }
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 12,
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        flex: 1,
-                                        child: DropdownButtonFormField<String>(
-                                          value: selectedPeriod,
-                                          decoration: InputDecoration(
-                                            labelText: 'Period',
-                                            border: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-                                            contentPadding:
-                                                const EdgeInsets.symmetric(
-                                                  horizontal: 12,
-                                                  vertical: 8,
-                                                ),
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
+                                            color: Colors.grey.shade300,
                                           ),
-                                          items: [
-                                            const DropdownMenuItem(
-                                              value: 'all',
-                                              child: Flexible(
-                                                child: Text(
-                                                  'All Periods',
-                                                  softWrap: true,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.calendar_month,
+                                              size: 20,
+                                              color: Colors.indigo.shade600,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              selectedDate == null
+                                                  ? 'Select Date'
+                                                  : '${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}',
+                                              style: TextStyle(
+                                                color: selectedDate == null
+                                                    ? Colors.grey.shade600
+                                                    : Colors.black,
                                               ),
                                             ),
-                                            ...periods.map((period) {
-                                              return DropdownMenuItem(
-                                                value: period['id'],
-                                                child: Text(period['name']!),
-                                              );
-                                            }),
                                           ],
-                                          onChanged: (value) {
-                                            setState(() {
-                                              selectedPeriod = value!;
-                                            });
-                                          },
                                         ),
                                       ),
-                                    ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: DropdownButtonFormField<String>(
+                                      value: selectedPeriod,
+                                      decoration: InputDecoration(
+                                        labelText: 'Period',
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 8,
+                                            ),
+                                      ),
+                                      items: [
+                                        const DropdownMenuItem(
+                                          value: 'all',
+                                          child: Text('All'),
+                                        ),
+                                        ...periods.map((period) {
+                                          return DropdownMenuItem(
+                                            value: period['id'],
+                                            child: Text('P${period['id']}'),
+                                          );
+                                        }),
+                                      ],
+                                      onChanged: (value) {
+                                        setState(() {
+                                          selectedPeriod = value!;
+                                        });
+                                      },
+                                    ),
                                   ),
                                 ],
                               ),
+                              if (selectedDate == null) ...[
+                                const SizedBox(height: 12),
+                                DropdownButtonFormField<String>(
+                                  value: selectedMonth,
+                                  decoration: InputDecoration(
+                                    labelText: 'Month',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
+                                  ),
+                                  items: List.generate(12, (index) {
+                                    return DropdownMenuItem(
+                                      value: months[index],
+                                      child: Text(months[index]),
+                                    );
+                                  }),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      selectedMonth = value!;
+                                      _loadAttendanceData();
+                                    });
+                                  },
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -739,6 +835,28 @@ class _StudentAttendanceViewerState extends State<StudentAttendanceViewer> {
                                                     fontSize: 16,
                                                   ),
                                                 ),
+                                                if (record['subjectTitle'] !=
+                                                        null &&
+                                                    record['subjectTitle'] !=
+                                                        'N/A')
+                                                  Padding(
+                                                    padding:
+                                                        const EdgeInsets.only(
+                                                          top: 2,
+                                                        ),
+                                                    child: Text(
+                                                      record['subjectTitle']
+                                                          as String,
+                                                      style: TextStyle(
+                                                        fontSize: 14,
+                                                        color: Colors
+                                                            .indigo
+                                                            .shade700,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                  ),
                                                 const SizedBox(height: 4),
                                                 Text(
                                                   formatDate(

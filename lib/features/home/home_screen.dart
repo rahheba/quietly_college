@@ -36,17 +36,17 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _userName = data?['name']?.toString() ?? 'Student';
           _userClass = data?['classname']?.toString() ?? '';
-          _userDataLoaded = true;
-        });
+              _userDataLoaded = true;
+            });
       }
     } catch (_) {}
   }
 
   Future<void> _toggleClassMode() async {
     if (_isLoading) return;
-    
+
     setState(() => _isLoading = true);
-    
+
     try {
       if (!_isClassMode) {
         if (!await _dndService.hasAccess()) {
@@ -264,18 +264,18 @@ class _HomeScreenState extends State<HomeScreen> {
                     _buildScheduleItem(
                       'Mathematics',
                       '9:00 AM - 10:00 AM',
-                      Colors.blue,
+                                Colors.blue,
                     ),
                     _buildScheduleItem(
                       'Physics',
                       '10:15 AM - 11:15 AM',
-                      Colors.orange,
+                                Colors.orange,
                     ),
                     _buildScheduleItem(
                       'Chemistry',
                       '11:30 AM - 12:30 PM',
-                      Colors.green,
-                    ),
+                                Colors.green,
+                      ),
                   ],
                 ),
               ),

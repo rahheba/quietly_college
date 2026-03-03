@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 
 class AdminHomeScreen extends StatelessWidget {
   final VoidCallback? onnavstd;
-  
+
   const AdminHomeScreen({super.key, this.onnavstd});
-  
+
   @override
   Widget build(BuildContext context) {
     final bool isMobile = MediaQuery.of(context).size.width < 600;
@@ -64,10 +64,12 @@ class AdminHomeScreen extends StatelessWidget {
           builder: (context, asyncSnapshot) {
             return _buildStatCard(
               ontap: () {
-                if (onnavstd != null) onnavstd!();
+                // if (onnavstd != null) onnavstd!();
               },
               title: 'Total Classes',
-              value: (asyncSnapshot.data == null || asyncSnapshot.data!.docs.isEmpty)
+              value:
+                  (asyncSnapshot.data == null ||
+                      asyncSnapshot.data!.docs.isEmpty)
                   ? '0'
                   : asyncSnapshot.data!.docs.length.toString(),
               icon: Icons.class_outlined,
@@ -77,7 +79,7 @@ class AdminHomeScreen extends StatelessWidget {
           },
         ),
         SizedBox(height: 8),
-        
+
         // Total Students Card
         StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
@@ -88,10 +90,12 @@ class AdminHomeScreen extends StatelessWidget {
           builder: (context, asyncSnapshot) {
             return _buildStatCard(
               ontap: () {
-                if (onnavstd != null) onnavstd!();
+                // if (onnavstd != null) onnavstd!();
               },
               title: 'Total Students',
-              value: (asyncSnapshot.data == null || asyncSnapshot.data!.docs.isEmpty)
+              value:
+                  (asyncSnapshot.data == null ||
+                      asyncSnapshot.data!.docs.isEmpty)
                   ? '0'
                   : asyncSnapshot.data!.docs.length.toString(),
               icon: Icons.school_outlined,
@@ -101,7 +105,7 @@ class AdminHomeScreen extends StatelessWidget {
           },
         ),
         SizedBox(height: 8),
-        
+
         // Total Teachers Card
         StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
@@ -113,7 +117,9 @@ class AdminHomeScreen extends StatelessWidget {
             return _buildStatCard(
               ontap: () {},
               title: 'Total Teachers',
-              value: (asyncSnapshot.data == null || asyncSnapshot.data!.docs.isEmpty)
+              value:
+                  (asyncSnapshot.data == null ||
+                      asyncSnapshot.data!.docs.isEmpty)
                   ? '0'
                   : asyncSnapshot.data!.docs.length.toString(),
               icon: Icons.person_outline,

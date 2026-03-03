@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:quietly/features/attendance_view/attendance_view.dart';
 import 'package:quietly/features/home/home_screen.dart';
 import 'package:quietly/features/notification/notification.dart';
 import 'package:quietly/features/parent/show_attendence.dart';
 import 'package:quietly/features/profile/profile.dart';
-import 'package:quietly/features/attendance_view/attendance_view.dart';
 
 class BottomNav extends StatefulWidget {
   @override
@@ -20,7 +20,7 @@ class _MainScreenState extends State<BottomNav> {
         index: _currentIndex,
         children: [
           HomeScreen(),
-          ParentAttendanceScreen(),
+          StudentAttendanceViewer(),
           NotificationScreen(),
           ProfileScreen(),
         ],
@@ -38,7 +38,7 @@ class _MainScreenState extends State<BottomNav> {
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(
             icon: Icon(Icons.calendar_month),
-            label: 'Attedence',
+            label: 'Attendance',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.notifications),

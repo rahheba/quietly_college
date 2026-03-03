@@ -188,6 +188,46 @@ class _TeacherManagementPageState extends State<TeacherManagementPage>
     );
   }
 
+  void _confirmPermanentDelete(
+    BuildContext context,
+    String teacherId,
+    String teacherName,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Permanent Delete'),
+        content: Text(
+          'Are you sure you want to permanently delete $teacherName?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              _deleteTeacher(teacherId);
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteTeacher(String teacherId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('Users')
+          .doc(teacherId)
+          .delete();
+    } catch (e) {
+      debugPrint('Delete failed: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -284,6 +324,7 @@ class _TeacherManagementPageState extends State<TeacherManagementPage>
                         ),
                       ),
                       child: ListTile(
+                        contentPadding: EdgeInsets.zero,
                         leading: CircleAvatar(
                           backgroundColor: statusColor.withOpacity(0.1),
                           child: Icon(Icons.person, color: statusColor),
@@ -453,6 +494,24 @@ class _TeacherManagementPageState extends State<TeacherManagementPage>
                                 return items;
                               },
                             ),
+                            if (status == -1)
+                              Positioned(
+                                top: 0,
+                                right: 0,
+                                child: IconButton(
+                                  icon: const Icon(
+                                    Icons.delete_forever,
+                                    color: Colors.red,
+                                  ),
+                                  onPressed: () {
+                                    _confirmPermanentDelete(
+                                      context,
+                                      teacherId,
+                                      name,
+                                    );
+                                  },
+                                ),
+                              ),
                           ],
                         ),
                       ),

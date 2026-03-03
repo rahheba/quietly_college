@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:quietly/features/admin/class/classlist_screen.dart';
+import 'package:quietly/features/admin/department/department_list_screen.dart';
 import 'package:quietly/features/admin/home/home_screen.dart';
 import 'package:quietly/features/admin/teacher/teacher_list_screen.dart';
 import 'package:quietly/features/auth/view/login_screen.dart';
@@ -29,15 +30,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
       AdminHomeScreen(
         onnavstd: () {
           _selectedIndex = 1;
-          setState(() {
-            
-          });
+          setState(() {});
         },
       ),
       ClassesListScreen(),
       // StudentManagementPage(),
       // ParentManagementPage(),
       TeacherManagementPage(),
+      DepartmentListScreen(),
     ];
   }
 
@@ -128,6 +128,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   icon: Icon(Icons.person),
                   label: 'Teachers',
                 ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.business),
+                  label: 'Departments',
+                ),
               ],
             )
           : null,
@@ -165,6 +169,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       icon: Icon(Icons.person_outline),
                       selectedIcon: Icon(Icons.person),
                       label: Text('Teachers'),
+                    ),
+                    NavigationRailDestination(
+                      icon: Icon(Icons.business_outlined),
+                      selectedIcon: Icon(Icons.business),
+                      label: Text('Departments'),
                     ),
                   ],
                 ),

@@ -42,7 +42,9 @@ class _ParentDashboardState extends State<ParentDashboard> {
         return;
       }
       final parentId = parentDoc.docs.first.id;
-      final classesSnapshot = await FirebaseFirestore.instance.collection('Classes').get();
+      final classesSnapshot = await FirebaseFirestore.instance
+          .collection('Classes')
+          .get();
       classes = classesSnapshot.docs;
       children.clear();
       for (var classDoc in classes) {
@@ -56,17 +58,55 @@ class _ParentDashboardState extends State<ParentDashboard> {
           final data = studentDoc.data();
           final name = data['name']?.toString() ?? 'Child';
           final initials = name.isNotEmpty
-              ? name.split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase()
+              ? name
+                    .split(' ')
+                    .map((w) => w.isNotEmpty ? w[0] : '')
+                    .take(2)
+                    .join()
+                    .toUpperCase()
               : '?';
+
+          // Fetch today's attendance
+          final now = DateTime.now();
+          final startOfDay = DateTime(now.year, now.month, now.day);
+          final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+          final attendanceSnapshot = await FirebaseFirestore.instance
+              .collection('Classes')
+              .doc(classDoc.id)
+              .collection('Students')
+              .doc(studentDoc.id)
+              .collection('attendance')
+              .where('date', isGreaterThanOrEqualTo: startOfDay)
+              .where('date', isLessThanOrEqualTo: endOfDay)
+              .get();
+
+          int attended = 0;
+          String todayStatus = 'Absent';
+          if (attendanceSnapshot.docs.isNotEmpty) {
+            attended = attendanceSnapshot.docs
+                .where(
+                  (doc) =>
+                      doc.data()['status'] == 'present' ||
+                      doc.data()['status'] == 'late',
+                )
+                .length;
+            todayStatus = attended > 0 ? 'Present' : 'Absent';
+          }
+
           children.add({
+            'id': studentDoc.id,
+            'classId': classDoc.id,
             'name': name,
             'grade': data['classname']?.toString() ?? 'N/A',
-            'avatar': initials.length >= 2 ? initials : (name.isNotEmpty ? name[0].toUpperCase() : '?'),
-            'todayAttendance': 'Present',
+            'avatar': initials.length >= 2
+                ? initials
+                : (name.isNotEmpty ? name[0].toUpperCase() : '?'),
+            'todayAttendance': todayStatus,
             'phoneStatus': 'Active',
             'totalClasses': 6,
-            'attendedToday': 5,
-            'currentClass': '—',
+            'attendedToday': attended,
+            'currentClass': _getCurrentClassStatus(),
           });
         }
       }
@@ -95,6 +135,32 @@ class _ParentDashboardState extends State<ParentDashboard> {
     {'subject': 'History', 'time': '01:00 PM - 01:45 PM', 'room': 'Room 301'},
   ];
 
+  String _getCurrentClassStatus() {
+    final now = DateTime.now();
+    final double hour = now.hour + now.minute / 60.0;
+
+    // Schedule:
+    // P1: 09:30 - 10:30 (9.5 - 10.5)
+    // P2: 10:30 - 11:30 (10.5 - 11.5)
+    // Break: 11:30 - 11:45
+    // P3: 11:45 - 12:45 (11.75 - 12.75)
+    // Lunch: 12:45 - 13:15
+    // P4: 13:15 - 14:15 (13.25 - 14.25)
+    // P5: 14:15 - 15:15 (14.25 - 15.25)
+
+    if (hour >= 9.5 && hour < 10.5) return 'Period 1';
+    if (hour >= 10.5 && hour < 11.5) return 'Period 2';
+    if (hour >= 11.5 && hour < 11.75) return 'Short Break';
+    if (hour >= 11.75 && hour < 12.75) return 'Period 3';
+    if (hour >= 12.75 && hour < 13.25) return 'Lunch Break';
+    if (hour >= 13.25 && hour < 14.25) return 'Period 4';
+    if (hour >= 14.25 && hour < 15.25) return 'Period 5';
+    if (hour >= 15.25) return 'School Over';
+    if (hour < 9.5) return 'Not Started';
+
+    return '—';
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -107,14 +173,22 @@ class _ParentDashboardState extends State<ParentDashboard> {
     if (children.isEmpty) {
       return Scaffold(
         backgroundColor: const Color(0xFFFEF3C7),
-        appBar: AppBar(backgroundColor: Colors.white, elevation: 1, title: const Text('Quietly')),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 1,
+          title: const Text('Quietly'),
+        ),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.people_outline, size: 64, color: Colors.grey.shade400),
+                Icon(
+                  Icons.people_outline,
+                  size: 64,
+                  color: Colors.grey.shade400,
+                ),
                 const SizedBox(height: 16),
                 Text(
                   'No children linked to your account yet.',
@@ -133,7 +207,8 @@ class _ParentDashboardState extends State<ParentDashboard> {
         ),
       );
     }
-    final selectedChild = children[selectedChildIndex.clamp(0, children.length - 1)];
+    final selectedChild =
+        children[selectedChildIndex.clamp(0, children.length - 1)];
 
     return Scaffold(
       backgroundColor: const Color(0xFFFEF3C7),
@@ -308,10 +383,10 @@ class _ParentDashboardState extends State<ParentDashboard> {
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
-                childAspectRatio: 1.5,
+                childAspectRatio: 1.3,
                 children: [
                   _buildStatCard(
-                    icon: Icons.check_circle,
+                    icon: Icons.check_circle_outline,
                     iconColor: Colors.green,
                     title: 'Today\'s Attendance',
                     value:
@@ -319,28 +394,44 @@ class _ParentDashboardState extends State<ParentDashboard> {
                     badge: selectedChild['todayAttendance'],
                     badgeColor: Colors.green.shade50,
                     badgeTextColor: Colors.green.shade700,
+                    gradientColors: [
+                      Colors.green.shade400,
+                      Colors.green.shade700,
+                    ],
                   ),
                   _buildStatCard(
-                    icon: Icons.phone_android,
+                    icon: Icons.phone_android_outlined,
                     iconColor: const Color(0xFFD97706),
                     title: 'Phone Status',
                     value: 'Active',
                     badge: selectedChild['phoneStatus'],
                     badgeColor: const Color(0xFFFEF3C7),
                     badgeTextColor: const Color(0xFFB45309),
+                    gradientColors: [
+                      const Color(0xFFF59E0B),
+                      const Color(0xFFB45309),
+                    ],
                   ),
                   _buildStatCard(
-                    icon: Icons.calendar_today,
-                    iconColor: const Color(0xFFB45309),
+                    icon: Icons.calendar_today_outlined,
+                    iconColor: Colors.indigo,
                     title: 'Current Class',
                     value: selectedChild['currentClass'],
+                    gradientColors: [
+                      Colors.indigo.shade400,
+                      Colors.indigo.shade700,
+                    ],
                   ),
                   _buildStatCard(
-                    icon: Icons.access_time,
-                    iconColor: const Color(0xFFEA580C),
-                    title: 'Classes Remaining',
+                    icon: Icons.access_time_outlined,
+                    iconColor: Colors.orange,
+                    title: 'Remaining',
                     value:
                         '${selectedChild['totalClasses'] - selectedChild['attendedToday']}',
+                    gradientColors: [
+                      Colors.orange.shade400,
+                      Colors.orange.shade700,
+                    ],
                   ),
                 ],
               ),
@@ -514,7 +605,9 @@ class _ParentDashboardState extends State<ParentDashboard> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => ParentAttendanceScreen(),
+                                builder: (context) => ParentAttendanceScreen(
+                                  initialChildId: selectedChild['id'],
+                                ),
                               ),
                             );
                           },
@@ -549,61 +642,109 @@ class _ParentDashboardState extends State<ParentDashboard> {
     String? badge,
     Color? badgeColor,
     Color? badgeTextColor,
+    required List<Color> gradientColors,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFFEF3C7)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Icon(icon, color: iconColor, size: 32),
-              if (badge != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: badgeColor,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    badge,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: badgeTextColor,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(color: Colors.grey, fontSize: 12),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
+        boxShadow: [
+          BoxShadow(
+            color: gradientColors[0].withOpacity(0.08),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
           ),
         ],
+        border: Border.all(color: const Color(0xFFFEF3C7).withOpacity(0.5)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Stack(
+          children: [
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                height: 3,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: gradientColors,
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: gradientColors[0].withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(icon, color: gradientColors[0], size: 18),
+                      ),
+                      if (badge != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: badgeColor,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            badge,
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: badgeTextColor,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        value,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade900,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

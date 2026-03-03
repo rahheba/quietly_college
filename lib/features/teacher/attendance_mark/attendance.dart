@@ -1124,6 +1124,8 @@ class _TeacherAttendanceModifierState extends State<TeacherAttendanceModifier> {
   String saveStatus = '';
   bool isLoading = false;
   bool isLoadingStudents = false;
+  List<Map<String, dynamic>> subjects = [];
+  String? selectedSubjectId;
 
   final List<Map<String, String>> periods = [
     {
@@ -1227,11 +1229,41 @@ class _TeacherAttendanceModifierState extends State<TeacherAttendanceModifier> {
         (a, b) => a['name'].toString().compareTo(b['name'].toString()),
       );
       await _loadAttendanceRecords();
+      await _loadSubjects();
     } catch (e) {
       print('Error loading students: $e');
       _showErrorSnackbar('Error loading students: $e');
     } finally {
       setState(() => isLoadingStudents = false);
+    }
+  }
+
+  Future<void> _loadSubjects() async {
+    if (selectedClass.isEmpty) return;
+    try {
+      final subjectsSnapshot = await FirebaseFirestore.instance
+          .collection('Classes')
+          .doc(selectedClass)
+          .collection('Subjects')
+          .get();
+
+      setState(() {
+        subjects = subjectsSnapshot.docs.map((doc) {
+          final data = doc.data();
+          return {
+            'id': doc.id,
+            'title': data['title'] ?? 'N/A',
+            'code': data['code'] ?? 'N/A',
+          };
+        }).toList();
+
+        // Auto-select first subject if available and none selected
+        if (subjects.isNotEmpty && selectedSubjectId == null) {
+          selectedSubjectId = subjects.first['id'];
+        }
+      });
+    } catch (e) {
+      print('Error loading subjects: $e');
     }
   }
 
@@ -1339,8 +1371,10 @@ class _TeacherAttendanceModifierState extends State<TeacherAttendanceModifier> {
   }
 
   Future<void> _saveAttendance() async {
-    if (selectedClass.isEmpty || selectedPeriod.isEmpty) {
-      _showErrorSnackbar('Please select class and period first');
+    if (selectedClass.isEmpty ||
+        selectedPeriod.isEmpty ||
+        selectedSubjectId == null) {
+      _showErrorSnackbar('Please select class, period and subject first');
       return;
     }
     if (modifiedRecords.isEmpty) {
@@ -1377,6 +1411,11 @@ class _TeacherAttendanceModifierState extends State<TeacherAttendanceModifier> {
             'lateAfter': periods.firstWhere(
               (p) => p['id'] == selectedPeriod,
             )['lateAfter'],
+            'subjectId': selectedSubjectId,
+            'subjectTitle': subjects.firstWhere(
+              (s) => s['id'] == selectedSubjectId,
+              orElse: () => {'title': 'N/A'},
+            )['title'],
           };
 
           batch.set(attendanceRef, attendanceData);
@@ -1495,10 +1534,73 @@ class _TeacherAttendanceModifierState extends State<TeacherAttendanceModifier> {
                   onChanged: (value) {
                     setState(() {
                       selectedClass = value ?? '';
+                      selectedSubjectId = null;
+                      subjects = [];
                       modifiedRecords.clear();
                       saveStatus = '';
                     });
                     _loadStudents();
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSubjectDropdown() {
+    if (selectedClass.isEmpty) return const SizedBox();
+
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'SELECT SUBJECT',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade600,
+                letterSpacing: 1,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: selectedSubjectId,
+                  isExpanded: true,
+                  hint: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: Text('Choose a subject...'),
+                  ),
+                  items: subjects.map((sub) {
+                    return DropdownMenuItem<String>(
+                      value: sub['id'],
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          '${sub['title']} (${sub['code']})',
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      selectedSubjectId = value;
+                      modifiedRecords.clear();
+                      saveStatus = '';
+                    });
                   },
                 ),
               ),
@@ -1559,7 +1661,7 @@ class _TeacherAttendanceModifierState extends State<TeacherAttendanceModifier> {
                     const SizedBox(width: 12),
                     Text(
                       '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                      style: const TextStyle(fontSize: 14),
+                      style: const TextStyle(fontSize: 12),
                     ),
                     const Spacer(),
                     Icon(Icons.arrow_drop_down, color: Colors.grey.shade600),
@@ -2164,6 +2266,8 @@ class _TeacherAttendanceModifierState extends State<TeacherAttendanceModifier> {
                   Column(
                     children: [
                       _buildClassDropdown(),
+                      const SizedBox(height: 12),
+                      _buildSubjectDropdown(),
                       const SizedBox(height: 12),
                       Row(
                         children: [

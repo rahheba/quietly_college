@@ -82,31 +82,17 @@ class DnDService : FlutterPlugin, MethodChannel.MethodCallHandler {
     }
 
     /**
-     * Start background monitoring service
+     * Start background monitoring service (NO-OP now, moved to GeoMuteForegroundService)
      */
     private fun startMonitoring(result: MethodChannel.Result) {
-        try {
-            if (!QuietlyForegroundService.isServiceRunning()) {
-                QuietlyForegroundService.startService(context)
-            }
-            result.success(true)
-        } catch (e: Exception) {
-            result.error("START_MONITORING_FAILED", e.message, null)
-        }
+        result.success(true)
     }
 
     /**
-     * Stop background monitoring service
+     * Stop background monitoring service (NO-OP now, moved to GeoMuteForegroundService)
      */
     private fun stopMonitoring(result: MethodChannel.Result) {
-        try {
-            if (QuietlyForegroundService.isServiceRunning()) {
-                QuietlyForegroundService.stopService(context)
-            }
-            result.success(true)
-        } catch (e: Exception) {
-            result.error("STOP_MONITORING_FAILED", e.message, null)
-        }
+        result.success(true)
     }
 
     /**
@@ -138,10 +124,6 @@ class DnDService : FlutterPlugin, MethodChannel.MethodCallHandler {
      */
     private fun setSilent(result: MethodChannel.Result) {
         try {
-            // Service should already be running via startMonitoring, but ensure it is
-            if (!QuietlyForegroundService.isServiceRunning()) {
-                QuietlyForegroundService.startService(context)
-            }
             
             // Checks if we already muted the device. 
             // If true, we DO NOT overwrite the saved state, because the current state is already silent (our doing).

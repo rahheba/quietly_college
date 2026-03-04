@@ -1,25 +1,19 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:quietly/features/splash/splash_screen.dart';
-
-import 'utils/methods/mute_fn.dart';
+import 'package:quietly/utils/service/geo_mute_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // When app is opened from notification tap, native calls this to (re-)activate background monitoring
-  const backgroundChannel = MethodChannel('app.quietly.background');
-  backgroundChannel.setMethodCallHandler((call) async {
-    if (call.method == 'activateBackground') {
-      await initGeoMute();
-    }
-    return null;
-  });
-
   try {
     await Firebase.initializeApp();
-    await initGeoMute();
+
+    // Start tracking the target location automatically on app launch
+    await GeoMuteService.startMonitoring(
+      latitude: 10.9575776,
+      longitude: 76.3092229,
+    );
   } catch (e) {
     print('Initialization error: $e');
   }
@@ -36,7 +30,6 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Quietly',
       theme: ThemeData(
-
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
       home: const SplashScreen(),

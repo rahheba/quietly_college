@@ -314,7 +314,7 @@ class _TeacherManagementPageState extends State<TeacherManagementPage>
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
@@ -329,11 +329,19 @@ class _TeacherManagementPageState extends State<TeacherManagementPage>
                           backgroundColor: statusColor.withOpacity(0.1),
                           child: Icon(Icons.person, color: statusColor),
                         ),
-                        title: Text(name),
+                        title: Text(
+                          name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(email),
+                            Text(
+                              email,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                             const SizedBox(height: 4),
                             Row(
                               children: [
@@ -489,21 +497,17 @@ class _TeacherManagementPageState extends State<TeacherManagementPage>
                               },
                             ),
                             if (status == -1)
-                              Positioned(
-                                top: 0,
-                                right: 0,
-                                child: IconButton(
-                                  icon: const Icon(
-                                    Icons.delete_forever,
-                                    color: Colors.red,
-                                  ),
-                                  onPressed: () {
-                                    _confirmPermanentDelete(
-                                      context,
-                                      teacherId,
-                                      name,
-                                    );
-                                  },
+                              InkWell(
+                                onTap: () {
+                                  _confirmPermanentDelete(
+                                    context,
+                                    teacherId,
+                                    name,
+                                  );
+                                },
+                                child: Icon(
+                                  Icons.delete_forever,
+                                  color: Colors.red,
                                 ),
                               ),
                           ],

@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class GeoMuteService {
   double? targetLat;
   double? targetLng;
-  double targetRadiusMeters = 300.0;
+  double targetRadiusMeters = 3.1;
   bool isInside = false;
   bool _isFirstLocationUpdate = true;
 
@@ -26,10 +26,10 @@ class GeoMuteService {
 
     // FORCE UPDATE: Use hardcoded values as source of truth
     // ignoring cached prefs to ensure code changes take effect
-    targetLat = 10.9577913;
-    targetLng = 76.3087397;
+    targetLat = 10.9755178;
+    targetLng = 76.2169708;
 
-    targetRadiusMeters = prefs.getDouble(_keyTargetRadius) ?? 300.0;
+    targetRadiusMeters = prefs.getDouble(_keyTargetRadius) ?? 3.1;
 
     // FORCE RESET: Always start as 'outside' to ensure we trigger mute
     // if the user starts the app while already inside the zone.
